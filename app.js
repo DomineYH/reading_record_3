@@ -33,9 +33,14 @@
   ];
   let quoteIndex = 0;
 
-  // Pre-seed sample records for demo user '홍길동' if not existing
+  // Generate unique storage key based on student name AND password
+  function getUserStorageKey(name, password) {
+    return `${STORAGE_KEYS.RECORDS_PREFIX}${encodeURIComponent(name || '')}_${encodeURIComponent(password || '')}`;
+  }
+
+  // Pre-seed sample records for demo user '홍길동' (password: '1234') if not existing
   function initDemoData() {
-    const demoKey = STORAGE_KEYS.RECORDS_PREFIX + '홍길동';
+    const demoKey = getUserStorageKey('홍길동', '1234');
     if (!localStorage.getItem(demoKey)) {
       const demoRecords = [
         {
@@ -461,18 +466,18 @@
             currentUser = { name: result.name || name, password: password };
             localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
             
-            // If Apps Script returned records from Google Sheet, save them
+            // If Apps Script returned records from Google Sheet, save only matching user and password
             if (Array.isArray(result.records)) {
-              userRecords = result.records;
-              saveLocalRecords(name, userRecords);
+              userRecords = result.records.filter(r => r.name === currentUser.name && String(r.password) === String(currentUser.password));
+              saveLocalRecords(currentUser.name, currentUser.password, userRecords);
             } else {
-              userRecords = loadLocalRecords(name);
+              userRecords = loadLocalRecords(currentUser.name, currentUser.password);
             }
 
             onLoginSuccess(isInteractive, result.message || `${name} 학생 로그인 완료!`);
             return;
           } else if (result && result.message) {
-            // Wrong password error from Google Sheets
+            // Error message from Google Sheets
             showToast(result.message, true);
             if (isInteractive) {
               els.loginBtn.disabled = false;
@@ -503,7 +508,7 @@
 
       currentUser = { name, password };
       localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
-      userRecords = loadLocalRecords(name);
+      userRecords = loadLocalRecords(name, password);
 
       onLoginSuccess(isInteractive, `${name} 학생 환영합니다!`);
 
@@ -557,25 +562,36 @@
   }
 
   // ================= LOCAL STORAGE HELPERS =================
-  function loadLocalRecords(name) {
-    const key = STORAGE_KEYS.RECORDS_PREFIX + name;
+  // 사용자와 비밀번호가 같은 데이터만 불러오기
+  function loadLocalRecords(name, password) {
+    const key = getUserStorageKey(name, password);
     try {
       const data = localStorage.getItem(key);
-      return data ? JSON.parse(data) : [];
+      if (data) {
+        const records = JSON.parse(data);
+        // 사용자와 비밀번호가 모두 일치하는 페이지만 엄격히 필터링
+        return records.filter(r => r.name === name && String(r.password) === String(password));
+      }
+      return [];
     } catch (e) {
       return [];
     }
   }
 
-  function saveLocalRecords(name, records) {
-    const key = STORAGE_KEYS.RECORDS_PREFIX + name;
-    localStorage.setItem(key, JSON.stringify(records));
+  // 사용자와 비밀번호가 같은 데이터만 저장하기
+  function saveLocalRecords(name, password, records) {
+    const key = getUserStorageKey(name, password);
+    const filtered = records.filter(r => r.name === name && String(r.password) === String(password));
+    localStorage.setItem(key, JSON.stringify(filtered));
   }
 
   // ================= CUMULATIVE PAGES CALCULATION =================
-  // DB requirement: 누적페이지는 책페이지들의 합
+  // 사용자와 비밀번호가 같은 페이지만 누적 합산 (누적페이지는 책페이지들의 합)
   function getCurrentCumulativePages() {
-    return userRecords.reduce((sum, r) => sum + (Number(r.pageCount) || 0), 0);
+    if (!currentUser) return 0;
+    return userRecords
+      .filter(r => r.name === currentUser.name && String(r.password) === String(currentUser.password))
+      .reduce((sum, r) => sum + (Number(r.pageCount) || 0), 0);
   }
 
   function updateCumulativeLivePreview() {
@@ -681,9 +697,9 @@
         }
       }
 
-      // 2. Always maintain in userRecords and LocalStorage
+      // 2. Always maintain in userRecords and LocalStorage (사용자와 비밀번호가 같은 기록만)
       userRecords.push(newRecord);
-      saveLocalRecords(currentUser.name, userRecords);
+      saveLocalRecords(currentUser.name, currentUser.password, userRecords);
 
       // Reset form
       els.bookTitle.value = '';
@@ -745,8 +761,9 @@
 
       const json = await res.json();
       if (json && json.success && Array.isArray(json.records)) {
-        userRecords = json.records;
-        saveLocalRecords(name, userRecords);
+        // 사용자와 비밀번호가 같은 페이지만 필터링하여 저장
+        userRecords = json.records.filter(r => r.name === name && String(r.password) === String(password));
+        saveLocalRecords(name, password, userRecords);
         updateProfileBadgesAndStats();
         renderBookshelf();
         renderStats();
@@ -995,14 +1012,16 @@
     // Filter out from local array
     userRecords = userRecords.filter(r => !(r.title === selectedRecord.title && r.startDate === selectedRecord.startDate));
 
-    // Recalculate cumulative pages in chronological order
+    // Recalculate cumulative pages in chronological order (사용자와 비밀번호가 같은 기록만 누적)
     let runningPages = 0;
     userRecords.forEach(r => {
-      runningPages += (Number(r.pageCount) || 0);
-      r.cumulativePages = runningPages;
+      if (r.name === currentUser.name && String(r.password) === String(currentUser.password)) {
+        runningPages += (Number(r.pageCount) || 0);
+        r.cumulativePages = runningPages;
+      }
     });
 
-    saveLocalRecords(currentUser.name, userRecords);
+    saveLocalRecords(currentUser.name, currentUser.password, userRecords);
 
     closeDetailModal();
     updateProfileBadgesAndStats();

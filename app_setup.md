@@ -148,7 +148,7 @@ function doGet(e) {
   }
 }
 
-// 1. 학생 로그인 및 기존 기록 로드
+// 1. 학생 로그인 및 기존 기록 로드 (사용자와 비밀번호가 같은 페이지만 누적)
 function handleLogin(name, password) {
   const sheet = getSheet();
   ensureHeaders(sheet);
@@ -163,7 +163,6 @@ function handleLogin(name, password) {
   const rows = sheet.getDataRange().getValues();
   // 1행은 헤더
   let userFound = false;
-  let passMatched = false;
   let records = [];
   let cumulativePages = 0;
 
@@ -171,30 +170,25 @@ function handleLogin(name, password) {
     const rowName = String(rows[i][0]).trim();
     const rowPass = String(rows[i][1]).trim();
 
-    if (rowName === cleanName) {
+    // 사용자와 비밀번호가 둘 다 정확히 일치하는 행의 페이지만 누적 및 조회
+    if (rowName === cleanName && rowPass === cleanPass) {
       userFound = true;
-      if (rowPass === cleanPass) {
-        passMatched = true;
-        const pageCount = Number(rows[i][6]) || 0;
-        cumulativePages += pageCount;
-        records.push({
-          rowId: i + 1,
-          name: rowName,
-          startDate: formatDate(rows[i][2]),
-          endDate: formatDate(rows[i][3]),
-          title: rows[i][4],
-          publisher: rows[i][5],
-          pageCount: pageCount,
-          cumulativePages: Number(rows[i][7]) || cumulativePages,
-          review: rows[i][8],
-          createdAt: rows[i][9] || ''
-        });
-      }
+      const pageCount = Number(rows[i][6]) || 0;
+      cumulativePages += pageCount;
+      records.push({
+        rowId: i + 1,
+        name: rowName,
+        password: rowPass,
+        startDate: formatDate(rows[i][2]),
+        endDate: formatDate(rows[i][3]),
+        title: rows[i][4],
+        publisher: rows[i][5],
+        pageCount: pageCount,
+        cumulativePages: cumulativePages,
+        review: rows[i][8],
+        createdAt: rows[i][9] || ''
+      });
     }
-  }
-
-  if (userFound && !passMatched) {
-    return { success: false, message: '비밀번호가 일치하지 않습니다. 다시 확인해주세요.' };
   }
 
   // 신규 학생이거나 비밀번호가 일치하여 로그인 성공
@@ -209,7 +203,7 @@ function handleLogin(name, password) {
   };
 }
 
-// 2. 새로운 독서 기록 저장 (누적 페이지 자동 계산)
+// 2. 새로운 독서 기록 저장 (사용자와 비밀번호가 일치하는 페이지만 누적 계산)
 function handleAddRecord(data) {
   const sheet = getSheet();
   ensureHeaders(sheet);
@@ -230,20 +224,16 @@ function handleAddRecord(data) {
     return { success: false, message: '책 제목을 입력해주세요.' };
   }
 
-  // 기존 기록에서 누적 페이지 계산 및 비밀번호 일치 확인
+  // 사용자와 비밀번호가 같은 행의 페이지만 엄격하게 누적 합산
   const rows = sheet.getDataRange().getValues();
   let currentCumulative = 0;
-  let userFound = false;
 
   for (let i = 1; i < rows.length; i++) {
     const rowName = String(rows[i][0]).trim();
     const rowPass = String(rows[i][1]).trim();
 
-    if (rowName === name) {
-      userFound = true;
-      if (rowPass !== password) {
-        return { success: false, message: '비밀번호가 일치하지 않습니다.' };
-      }
+    // 사용자와 비밀번호가 일치할 때만 누적 계산
+    if (rowName === name && rowPass === password) {
       currentCumulative += (Number(rows[i][6]) || 0);
     }
   }
