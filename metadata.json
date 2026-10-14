@@ -1,0 +1,6 @@
+{
+  "name": "네이버 스타일 학생 독서기록장",
+  "description": "학생들의 독서 활동을 기록하고 구글 스프레드시트와 연동할 수 있는 네이버 스타일의 독서기록장 웹 애플리케이션입니다.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

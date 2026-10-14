@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>네이버 스타일 학생 독서기록장</title>
+  <meta name="description" content="학생들의 독서 활동을 기록하고 구글 스프레드시트와 연동할 수 있는 네이버 스타일의 독서기록장 웹 애플리케이션입니다." />
+  <meta property="og:title" content="네이버 스타일 학생 독서기록장" />
+  <meta property="og:description" content="학생들의 독서 활동을 기록하고 구글 스프레드시트와 연동할 수 있는 네이버 스타일의 독서기록장 웹 애플리케이션입니다." />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+
+  <!-- ================= NAVER PORTAL HEADER ================= -->
+  <header class="naver-header">
+    <div class="header-inner">
+      <div class="brand-section" onclick="switchTab('record')">
+        <span class="naver-logo-text">NAVER</span>
+        <span class="brand-badge">📚 학생 독서기록장</span>
+      </div>
+
+      <!-- Naver Signature Search Box -->
+      <div class="header-search">
+        <div class="search-box">
+          <input 
+            type="text" 
+            id="globalSearchInput" 
+            class="search-input" 
+            placeholder="내가 읽은 책 제목, 출판사, 감상 키워드 검색" 
+            autocomplete="off"
+          />
+          <button class="search-btn" id="searchSubmitBtn" title="검색">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Utilities (Google Sheets connection status & Setup) -->
+      <div class="header-utils">
+        <div id="gasStatusBadge" class="status-indicator local" title="구글 스프레드시트 연동 상태">
+          <span class="status-dot"></span>
+          <span id="gasStatusText">로컬 모드</span>
+        </div>
+        <button class="util-btn" id="openSettingsBtn" title="구글 스프레드시트 Apps Script 연동">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          스프레드시트 연동
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= NAVER PORTAL MENU BAR ================= -->
+  <nav class="portal-menu-bar">
+    <div class="menu-inner">
+      <button class="menu-tab active" data-tab="record">
+        <span>✏️</span> 독서 기록 작성
+      </button>
+      <button class="menu-tab" data-tab="shelf">
+        <span>📚</span> 나의 서재 / 도서 목록 (<span id="menuBookCount">0</span>)
+      </button>
+      <button class="menu-tab" data-tab="stats">
+        <span>🏆</span> 독서 통계 및 뱃지
+      </button>
+      <button class="menu-tab" data-tab="recommend">
+        <span>💡</span> 네이버 책 추천 & 독서 팁
+      </button>
+    </div>
+  </nav>
+
+  <!-- ================= MAIN LAYOUT (2 Columns) ================= -->
+  <main class="layout-container">
+    
+    <!-- LEFT COLUMN: Main Functional Views -->
+    <section class="main-column">
+
+      <!-- ================= TAB 1: 독서 기록 작성 ================= -->
+      <div id="tab-record" class="tab-pane">
+        <div class="naver-card">
+          <div class="card-header">
+            <h2 class="card-title">
+              <span class="card-title-icon">📖</span>
+              새로운 독서 기록 작성
+            </h2>
+            <span class="label-hint">기록은 구글 스프레드시트에 영구 보관됩니다.</span>
+          </div>
+
+          <div class="card-body">
+            
+            <!-- When Not Logged In Notice -->
+            <div id="loginRequiredNotice" class="empty-state" style="padding: 30px 20px; display: none;">
+              <div class="empty-icon">🔒</div>
+              <h3 class="empty-title">로그인이 필요합니다</h3>
+              <p class="empty-desc">학생 이름과 비밀번호로 로그인하면 개인별 누적 독서 페이지가 계산되고 기록을 저장할 수 있습니다.</p>
+              <button class="util-btn primary" onclick="document.getElementById('studentNameInput').focus();">
+                우측에서 학생 로그인하기
+              </button>
+            </div>
+
+            <!-- Form Content (Visible when logged in) -->
+            <form id="readingRecordForm">
+              
+              <!-- Real-time Cumulative Page Calculation Banner -->
+              <div class="cumulative-calc-box">
+                <div class="calc-info">
+                  <div class="calc-step">
+                    <span class="calc-step-label">현재 내 누적 페이지</span>
+                    <span class="calc-step-val" id="displayCurrentPages">0 쪽</span>
+                  </div>
+                  <span class="calc-symbol">➕</span>
+                  <div class="calc-step">
+                    <span class="calc-step-label">이번 책 페이지</span>
+                    <span class="calc-step-val" id="displayThisPage">0 쪽</span>
+                  </div>
+                  <span class="calc-symbol">🟰</span>
+                </div>
+                <div class="calc-result">
+                  <div class="calc-result-title">등록 후 총 누적 페이지</div>
+                  <div class="calc-result-num" id="displayNewCumulative">0 쪽</div>
+                </div>
+              </div>
+
+              <!-- Form Fields Grid -->
+              <div class="form-grid">
+                
+                <!-- 책 제목 -->
+                <div class="form-group">
+                  <label class="form-label" for="bookTitle">
+                    <span>책 제목 <span class="req-mark">*</span></span>
+                  </label>
+                  <input 
+                    type="text" 
+                    id="bookTitle" 
+                    class="form-control" 
+                    placeholder="예: 어린 왕자, 아몬드, 모모" 
+                    required 
+                  />
+                </div>
+
+                <!-- 출판사 -->
+                <div class="form-group">
+                  <label class="form-label" for="bookPublisher">
+                    <span>출판사 <span class="req-mark">*</span></span>
+                  </label>
+                  <input 
+                    type="text" 
+                    id="bookPublisher" 
+                    class="form-control" 
+                    placeholder="예: 열린책들, 창비, 비룡소" 
+                    required 
+                  />
+                </div>
+
+                <!-- 책 읽기 시작한 날 -->
+                <div class="form-group">
+                  <label class="form-label" for="startDate">
+                    <span>책 읽기 시작한 날 <span class="req-mark">*</span></span>
+                  </label>
+                  <input 
+                    type="date" 
+                    id="startDate" 
+                    class="form-control" 
+                    required 
+                  />
+                </div>
+
+                <!-- 다 읽은 날 -->
+                <div class="form-group">
+                  <label class="form-label" for="endDate">
+                    <span>다 읽은 날 <span class="req-mark">*</span></span>
+                    <span class="label-hint" id="readingDurationHint"></span>
+                  </label>
+                  <input 
+                    type="date" 
+                    id="endDate" 
+                    class="form-control" 
+                    required 
+                  />
+                </div>
+
+                <!-- 책 페이지 -->
+                <div class="form-group">
+                  <label class="form-label" for="bookPages">
+                    <span>책 페이지 (쪽수) <span class="req-mark">*</span></span>
+                    <span class="label-hint">숫자만 입력</span>
+                  </label>
+                  <input 
+                    type="number" 
+                    id="bookPages" 
+                    class="form-control" 
+                    placeholder="예: 240" 
+                    min="1" 
+                    max="9999" 
+                    required 
+                  />
+                </div>
+
+                <!-- 나의 별점 -->
+                <div class="form-group">
+                  <label class="form-label">
+                    <span>나의 별점</span>
+                    <span class="rating-text" id="ratingText">5점 / 적극 추천해요!</span>
+                  </label>
+                  <div class="star-rating-box" id="starRatingBox">
+                    <button type="button" class="star-btn active" data-rating="1">★</button>
+                    <button type="button" class="star-btn active" data-rating="2">★</button>
+                    <button type="button" class="star-btn active" data-rating="3">★</button>
+                    <button type="button" class="star-btn active" data-rating="4">★</button>
+                    <button type="button" class="star-btn active" data-rating="5">★</button>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- 감상 (소감 및 느낀 점) -->
+              <div class="form-group">
+                <label class="form-label" for="bookReview">
+                  <span>감상 (독서 소감 및 인상 깊었던 점) <span class="req-mark">*</span></span>
+                  <span class="label-hint"><span id="reviewCharCount">0</span> / 1,000자</span>
+                </label>
+                <textarea 
+                  id="bookReview" 
+                  class="form-control" 
+                  placeholder="책을 읽고 느낀 점이나 가장 인상 깊었던 구절, 생각의 변화 등을 자유롭게 적어보세요." 
+                  maxlength="1000" 
+                  required
+                ></textarea>
+                
+                <!-- Quick Thought Tags -->
+                <div class="review-prompts">
+                  <span class="prompt-chip" onclick="addReviewPrompt('결말의 여운이 깊게 남았다.')">+ 결말의 여운</span>
+                  <span class="prompt-chip" onclick="addReviewPrompt('주인공의 용기 있는 태도가 인상 깊었다.')">+ 주인공의 태도</span>
+                  <span class="prompt-chip" onclick="addReviewPrompt('친구들에게 꼭 추천해주고 싶은 명작이다.')">+ 친구에게 추천</span>
+                  <span class="prompt-chip" onclick="addReviewPrompt('나의 일상과 주변을 다시 돌아보게 되었다.')">+ 나의 삶과 연결</span>
+                </div>
+              </div>
+
+              <!-- Submit Button -->
+              <button type="submit" id="submitRecordBtn" class="btn-naver-submit">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                  <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                  <polyline points="7 3 7 8 15 8"></polyline>
+                </svg>
+                <span>독서 기록 등록하기</span>
+              </button>
+
+            </form>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= TAB 2: 나의 서재 / 도서 목록 ================= -->
+      <div id="tab-shelf" class="tab-pane" style="display: none;">
+        <div class="naver-card">
+          <div class="card-header">
+            <h2 class="card-title">
+              <span class="card-title-icon">📚</span>
+              나의 독서 서재
+            </h2>
+            <div class="toolbar-actions">
+              <button class="util-btn" id="exportCsvBtn" title="CSV 파일로 다운로드">
+                📥 엑셀(CSV) 내보내기
+              </button>
+              <button class="util-btn" id="printPortfolioBtn" title="인쇄하기">
+                🖨️ 인쇄
+              </button>
+            </div>
+          </div>
+
+          <div class="card-body">
+            
+            <!-- Bookshelf Filter Bar -->
+            <div class="bookshelf-toolbar">
+              <div class="toolbar-summary">
+                총 <span id="shelfBookCount">0</span>권 완독 
+                (<span id="shelfTotalPages">0</span>쪽)
+              </div>
+              <div class="toolbar-actions">
+                <select id="shelfSortSelect" class="sort-select">
+                  <option value="newest">최근 완독순</option>
+                  <option value="oldest">오래된 기록순</option>
+                  <option value="pagesDesc">페이지 많은 순</option>
+                  <option value="ratingDesc">별점 높은 순</option>
+                </select>
+                <div class="view-toggle">
+                  <button class="view-btn active" id="viewCardsBtn" title="카드 뷰">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="3" width="7" height="7"></rect>
+                      <rect x="14" y="3" width="7" height="7"></rect>
+                      <rect x="14" y="14" width="7" height="7"></rect>
+                      <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                  </button>
+                  <button class="view-btn" id="viewTableBtn" title="표(스프레드시트) 뷰">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="3" y1="6" x2="21" y2="6"></line>
+                      <line x1="3" y1="12" x2="21" y2="12"></line>
+                      <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyShelfState" class="empty-state" style="display: none;">
+              <div class="empty-icon">📖</div>
+              <h3 class="empty-title">아직 등록된 독서 기록이 없습니다</h3>
+              <p class="empty-desc">읽은 책을 기록하고 나만의 멋진 독서 포트폴리오를 만들어보세요!</p>
+              <button class="btn-naver-submit" style="width: auto; padding: 10px 24px; margin: 0 auto;" onclick="switchTab('record')">
+                첫 번째 도서 기록하기
+              </button>
+            </div>
+
+            <!-- Cards Container -->
+            <div id="bookCardsGrid" class="book-cards-grid"></div>
+
+            <!-- Table Container -->
+            <div id="bookTableWrapper" class="table-responsive" style="display: none; margin-top: 10px;">
+              <table class="naver-table">
+                <thead>
+                  <tr>
+                    <th>번호</th>
+                    <th>책 제목</th>
+                    <th>출판사</th>
+                    <th>읽기 시작한 날</th>
+                    <th>다 읽은 날</th>
+                    <th>페이지</th>
+                    <th>누적페이지</th>
+                    <th>별점</th>
+                    <th>감상</th>
+                    <th>관리</th>
+                  </tr>
+                </thead>
+                <tbody id="bookTableBody"></tbody>
+              </table>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= TAB 3: 독서 통계 및 뱃지 ================= -->
+      <div id="tab-stats" class="tab-pane" style="display: none;">
+        
+        <!-- 4 Major KPIs -->
+        <div class="stats-summary-grid">
+          <div class="stat-kpi-card">
+            <div class="kpi-icon">📚</div>
+            <div class="kpi-label">완독한 도서</div>
+            <div class="kpi-value"><span id="statBooksCount">0</span> <small>권</small></div>
+          </div>
+          <div class="stat-kpi-card">
+            <div class="kpi-icon">📄</div>
+            <div class="kpi-label">총 누적 페이지</div>
+            <div class="kpi-value"><span id="statCumulativePages">0</span> <small>쪽</small></div>
+          </div>
+          <div class="stat-kpi-card">
+            <div class="kpi-icon">📊</div>
+            <div class="kpi-label">권당 평균 페이지</div>
+            <div class="kpi-value"><span id="statAvgPages">0</span> <small>쪽</small></div>
+          </div>
+          <div class="stat-kpi-card">
+            <div class="kpi-icon">⭐</div>
+            <div class="kpi-label">평균 도서 평점</div>
+            <div class="kpi-value"><span id="statAvgRating">0.0</span> <small>점</small></div>
+          </div>
+        </div>
+
+        <!-- 1,000 Pages Reading Marathon Challenge -->
+        <div class="marathon-card">
+          <div class="marathon-header">
+            <div class="marathon-title">🏃 1,000쪽 독서 마라톤 챌린지</div>
+            <div class="marathon-percent" id="marathonPercent">0%</div>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="marathonFill" style="width: 0%;"></div>
+          </div>
+          <div class="marathon-subtext">
+            <span>현재 <strong id="marathonCurrentPages">0</strong> 쪽 달성</span>
+            <span>목표 1,000 쪽까지 <strong id="marathonRemainPages">1,000</strong> 쪽 남음</span>
+          </div>
+        </div>
+
+        <!-- Badges Card -->
+        <div class="naver-card">
+          <div class="card-header">
+            <h3 class="card-title">
+              <span class="card-title-icon">🎖️</span>
+              독서 업적 배지 컬렉션
+            </h3>
+            <span class="label-hint">독서 목표를 달성할 때마다 배지가 언락됩니다!</span>
+          </div>
+          <div class="card-body">
+            <div class="badges-grid" id="badgesContainer"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ================= TAB 4: 네이버 책 추천 & 팁 ================= -->
+      <div id="tab-recommend" class="tab-pane" style="display: none;">
+        
+        <div class="naver-card">
+          <div class="card-header">
+            <h3 class="card-title">
+              <span class="card-title-icon">💡</span>
+              네이버 도서 추천: 학생 추천 필독서
+            </h3>
+            <span class="label-hint">인기 청소년 & 어린이 문학 추천작</span>
+          </div>
+          <div class="card-body">
+            <div class="recommend-list">
+              
+              <div class="recommend-item">
+                <span class="rec-badge">문학</span>
+                <div class="rec-content">
+                  <h5>어린 왕자</h5>
+                  <div class="rec-author">앙투안 드 생텍쥐페리 / 열린책들 (약 140쪽)</div>
+                  <p class="rec-desc">"가장 중요한 것은 눈에 보이지 않아." 진정한 사랑과 관계의 가치를 일깨워주는 세계적인 명작.</p>
+                </div>
+              </div>
+
+              <div class="recommend-item">
+                <span class="rec-badge">성장소설</span>
+                <div class="rec-content">
+                  <h5>아몬드</h5>
+                  <div class="rec-author">손원평 / 창비 (약 270쪽)</div>
+                  <p class="rec-desc">감정을 느끼지 못하는 소년 윤재의 특별한 성장 이야기. 공감과 타인의 마음에 대해 깊게 생각하게 합니다.</p>
+                </div>
+              </div>
+
+              <div class="recommend-item">
+                <span class="rec-badge">판타지</span>
+                <div class="rec-content">
+                  <h5>모모</h5>
+                  <div class="rec-author">미하엘 엔데 / 비룡소 (약 350쪽)</div>
+                  <p class="rec-desc">시간을 훔쳐가는 회색 도둑들에 맞서는 소녀 모모. 시간과 경청의 참된 의미를 배우는 철학 판타지.</p>
+                </div>
+              </div>
+
+              <div class="recommend-item">
+                <span class="rec-badge">과학·인문</span>
+                <div class="rec-content">
+                  <h5>코스모스 (청소년을 위한 에디션)</h5>
+                  <div class="rec-author">칼 세이건 / 사이언스북스 (약 320쪽)</div>
+                  <p class="rec-desc">광활한 우주와 지구, 인류의 기원을 통해 지적 호기심과 경외감을 키워주는 과학 교양 필독서.</p>
+                </div>
+              </div>
+
+              <div class="recommend-item">
+                <span class="rec-badge">환경·자연</span>
+                <div class="rec-content">
+                  <h5>나무를 심은 사람</h5>
+                  <div class="rec-author">장 지오노 / 두레 (약 80쪽)</div>
+                  <p class="rec-desc">황폐한 대지를 묵묵히 푸른 숲으로 바꾼 한 노인의 위대한 헌신. 꾸준함의 힘을 증명하는 이야기.</p>
+                </div>
+              </div>
+
+              <div class="recommend-item">
+                <span class="rec-badge">역사·사회</span>
+                <div class="rec-content">
+                  <h5>자전거 도둑</h5>
+                  <div class="rec-author">박완서 / 다림 (약 180쪽)</div>
+                  <p class="rec-desc">순수한 소년 수남이의 눈을 통해 바라본 물질만능주의와 양심의 가치를 잔잔하게 그려낸 동화.</p>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <div class="naver-card">
+          <div class="card-header">
+            <h3 class="card-title">
+              <span class="card-title-icon">✍️</span>
+              더 좋은 독서 감상문을 쓰는 3가지 꿀팁
+            </h3>
+          </div>
+          <div class="card-body" style="font-size: 13px; line-height: 1.7; color: var(--text-main);">
+            <p><strong>1. 줄거리 요약보다 '내 마음이 움직인 순간'에 집중하기</strong><br>
+            전체 줄거리를 길게 늘어놓기보다는, 가장 놀라웠거나 가슴이 뭉클했던 단 하나의 장면에 대해 적어보세요.</p>
+            <br>
+            <p><strong>2. 책 속 주인공에게 하고 싶은 말 적어보기</strong><br>
+            "만약 나라면 그 상황에서 어떻게 행동했을까?", "주인공에게 위로의 한마디를 건넨다면?" 같은 가상의 질문을 던져보세요.</p>
+            <br>
+            <p><strong>3. 책을 읽기 전의 나와 읽은 후의 나 비교하기</strong><br>
+            이 책을 완독하고 나서 새롭게 알게 된 사실이나 세상을 바라보는 생각에 어떤 작은 변화가 생겼는지 기록해보세요.</p>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- RIGHT COLUMN: Sidebar (Naver Student Login & Apps Script DB Status) -->
+    <aside class="sidebar-column">
+      
+      <!-- Naver Student Login / Profile Box -->
+      <div class="naver-card" style="margin-bottom: 20px;">
+        
+        <!-- Not Logged In View -->
+        <div id="loginFormContainer" class="login-box">
+          <div class="login-header-bar">
+            <span>NAVER 학생 로그인</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+          </div>
+          <div class="login-content">
+            <form id="studentLoginForm">
+              <div class="input-group">
+                <label class="input-label" for="studentNameInput">학생 이름</label>
+                <input 
+                  type="text" 
+                  id="studentNameInput" 
+                  class="naver-input" 
+                  placeholder="예: 홍길동" 
+                  required 
+                />
+              </div>
+              <div class="input-group">
+                <label class="input-label" for="studentPasswordInput">비밀번호</label>
+                <input 
+                  type="password" 
+                  id="studentPasswordInput" 
+                  class="naver-input" 
+                  placeholder="숫자나 문자 비밀번호" 
+                  required 
+                />
+              </div>
+              <button type="submit" id="loginBtn" class="btn-naver-submit">
+                독서기록장 로그인
+              </button>
+            </form>
+
+            <div class="login-guide-note">
+              💡 <strong>처음 오셨나요?</strong><br>
+              본인 이름과 사용할 비밀번호를 입력하고 로그인하면 구글 스프레드시트 DB에 즉시 등록됩니다!
+            </div>
+
+            <div class="quick-demo-accounts">
+              <div class="demo-title">빠른 테스트용 계정</div>
+              <div class="demo-chips">
+                <button type="button" class="demo-chip" onclick="quickLogin('홍길동', '1234')">홍길동 (비번: 1234)</button>
+                <button type="button" class="demo-chip" onclick="quickLogin('이순신', '1234')">이순신 (비번: 1234)</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Logged In Profile View -->
+        <div id="profileContainer" class="profile-card" style="display: none;">
+          <div class="profile-top">
+            <div class="student-avatar" id="avatarInitial">학생</div>
+            <div class="student-info">
+              <h4><span id="profileStudentName">학생</span> 학생</h4>
+              <span class="student-badge-role" id="profileBadgeRole">🌱 새싹 독서가</span>
+            </div>
+          </div>
+
+          <div class="profile-stats-grid">
+            <div class="pstat-item">
+              <div class="pstat-label">완독 도서</div>
+              <div class="pstat-val" id="profileBooksCount">0 <small>권</small></div>
+            </div>
+            <div class="pstat-item">
+              <div class="pstat-label">총 누적 페이지</div>
+              <div class="pstat-val" id="profileCumulativePages">0 <small>쪽</small></div>
+            </div>
+          </div>
+
+          <div class="profile-actions">
+            <button class="btn-profile outline" id="syncRecordsBtn" title="구글 스프레드시트에서 새로고침">
+              🔄 동기화
+            </button>
+            <button class="btn-profile danger" id="logoutBtn" title="로그아웃">
+              로그아웃
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Google Apps Script DB Status Widget -->
+      <div class="naver-card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <span class="card-title-icon">📊</span>
+            Google Sheets DB 연동
+          </h3>
+        </div>
+        <div class="card-body" style="font-size: 13px;">
+          <p style="margin-bottom: 10px; color: var(--text-secondary); line-height: 1.5;">
+            스프레드시트에 <br>
+            <strong>이름 | 비밀번호 | 시작일 | 다 읽은 날 | 책 제목 | 출판사 | 페이지 | 누적페이지 | 감상</strong> 순으로 안전하게 저장됩니다.
+          </p>
+          <div style="background-color: var(--bg-subtle); padding: 10px; border-radius: var(--radius-sm); margin-bottom: 12px; font-size: 12px;">
+            연동 방식: <strong>Google Apps Script Web App</strong><br>
+            호스팅: <strong>GitHub Pages 호환 (순수 정적)</strong>
+          </div>
+          <button class="btn-profile outline" style="width: 100%; display: block;" onclick="openSettingsModal()">
+            ⚙️ 스프레드시트 URL 설정하기
+          </button>
+        </div>
+      </div>
+
+      <!-- Daily Reading Quote -->
+      <div class="naver-card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <span class="card-title-icon">🌱</span>
+            오늘의 독서 한 줄
+          </h3>
+          <button class="util-btn" style="padding: 2px 6px; font-size: 11px;" onclick="rotateQuote()">다음</button>
+        </div>
+        <div class="card-body">
+          <blockquote id="dailyQuoteText" style="font-style: italic; color: var(--text-main); font-size: 13px; line-height: 1.6; margin-bottom: 6px;">
+            "책 읽는 습관을 기르는 것은 인생의 거의 모든 불행으로부터 당신을 보호하는 피난처를 짓는 일이다."
+          </blockquote>
+          <div id="dailyQuoteAuthor" style="text-align: right; font-size: 11px; color: var(--text-muted);">
+            — 서머싯 몸
+          </div>
+        </div>
+      </div>
+
+    </aside>
+
+  </main>
+
+  <!-- ================= MODAL: Google Apps Script Setup ================= -->
+  <div id="settingsModal" class="modal-overlay">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3 class="modal-title">
+          <span>⚙️</span> Google Sheets Apps Script 연동 설정
+        </h3>
+        <button class="modal-close-btn" onclick="closeSettingsModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px; line-height: 1.5;">
+          구글 스프레드시트의 <strong>[확장 프로그램] ➡️ [Apps Script]</strong>에서 웹 앱으로 배포한 URL을 입력하세요.
+          상세한 작성법은 저장소의 <code>app_setup.md</code> 파일에 수록되어 있습니다.
+        </p>
+
+        <div class="form-group">
+          <label class="form-label" for="gasUrlInput">
+            <span>Apps Script 웹 앱 URL</span>
+          </label>
+          <input 
+            type="url" 
+            id="gasUrlInput" 
+            class="form-control" 
+            placeholder="https://script.google.com/macros/s/AKfycb.../exec" 
+          />
+        </div>
+
+        <div style="background-color: var(--naver-green-light); border: 1px solid var(--naver-green-border); padding: 12px; border-radius: var(--radius-sm); font-size: 12px; line-height: 1.6; margin-bottom: 16px;">
+          <strong>💡 배포 시 주의사항 (필수!)</strong><br>
+          • <strong>액세스 권한:</strong> 반드시 <code>모든 사용자 (Anyone)</code>로 지정해야 웹페이지에서 기록이 전송됩니다.<br>
+          • URL이 비어있는 상태에서는 <strong>브라우저 로컬 저장소(LocalStorage)</strong>에 데이터가 저장되므로 즉시 테스트 가능합니다.
+        </div>
+
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="util-btn primary" id="saveGasUrlBtn" style="flex: 1; padding: 10px;">
+            연동 저장 및 테스트
+          </button>
+          <button type="button" class="util-btn" id="clearGasUrlBtn" style="padding: 10px;">
+            초기화
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: Book Details ================= -->
+  <div id="bookDetailModal" class="modal-overlay">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3 class="modal-title">
+          <span>📖</span> <span id="detailModalTitle">도서 상세 정보</span>
+        </h3>
+        <button class="modal-close-btn" onclick="closeDetailModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="detailModalBody"></div>
+      <div class="modal-footer">
+        <button type="button" class="util-btn" style="color: #e53e3e; border-color: #ffccd2;" id="deleteRecordBtn">
+          🗑️ 이 기록 삭제하기
+        </button>
+        <button type="button" class="util-btn primary" onclick="closeDetailModal()">
+          닫기
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= TOAST CONTAINER ================= -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- ================= NAVER FOOTER ================= -->
+  <footer class="naver-footer">
+    <div class="footer-inner">
+      <div>
+        <strong>NAVER 독서기록장</strong> &copy; 2026. 순수 HTML, CSS, JavaScript로 구현된 학생 독서 포트폴리오.
+      </div>
+      <div class="footer-links">
+        <a href="#tab-record" onclick="switchTab('record')">독서 기록</a>
+        <a href="#tab-shelf" onclick="switchTab('shelf')">내 서재</a>
+        <a href="#tab-stats" onclick="switchTab('stats')">통계</a>
+        <a href="javascript:void(0)" onclick="openSettingsModal()">스프레드시트 설정 가이드</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="./app.js"></script>
+</body>
+</html>
